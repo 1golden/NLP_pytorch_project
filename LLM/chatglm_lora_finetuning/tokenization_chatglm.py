@@ -26,11 +26,22 @@ class SPTokenizer:
     ):
         assert vocab_file is not None
         self.vocab_file = vocab_file
-        self.special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "<unused_0>", "<sop>", "<eop>", "<ENC>", "<dBLOCK>"]
+        self.special_tokens = [
+            "[MASK]",
+            "[gMASK]",
+            "[sMASK]",
+            "<unused_0>",
+            "<sop>",
+            "<eop>",
+            "<ENC>",
+            "<dBLOCK>",
+        ]
         self.max_blank_length = max_blank_length
         self.byte_fallback = byte_fallback
         self.text_tokenizer = self._build_text_tokenizer(encode_special_tokens=False)
-        self.special_text_tokenizer = self._build_text_tokenizer(encode_special_tokens=True)
+        self.special_text_tokenizer = self._build_text_tokenizer(
+            encode_special_tokens=True
+        )
 
     @staticmethod
     def _configure_tokenizer(
@@ -41,29 +52,41 @@ class SPTokenizer:
         encode_special_tokens=False,
     ):
         # special token
-        special_token_type = 4 if encode_special_tokens else 3  # 3 - CONTROL, 4 - USER_DEFINE
+        special_token_type = (
+            4 if encode_special_tokens else 3
+        )  # 3 - CONTROL, 4 - USER_DEFINE
         for token in special_tokens:
             text_tokenizer.proto.pieces.append(
-                sp_model.ModelProto.SentencePiece(piece=token, score=0.0, type=special_token_type)
+                sp_model.ModelProto.SentencePiece(
+                    piece=token, score=0.0, type=special_token_type
+                )
             )
         # whitespaces
         for token in [SPTokenizer.get_tab_token()] + [
             SPTokenizer.get_blank_token(i) for i in range(2, max_blank_length + 1)
         ]:
-            text_tokenizer.proto.pieces.append(sp_model.ModelProto.SentencePiece(piece=token, score=0.0, type=4))
+            text_tokenizer.proto.pieces.append(
+                sp_model.ModelProto.SentencePiece(piece=token, score=0.0, type=4)
+            )
         # byte fallback
         if byte_fallback:
             text_tokenizer.proto.trainer_spec.byte_fallback = True
             for i in range(256):
                 text_tokenizer.proto.pieces.append(
-                    sp_model.ModelProto.SentencePiece(piece="<0x{:02X}>".format(i), score=0.0, type=6)
+                    sp_model.ModelProto.SentencePiece(
+                        piece="<0x{:02X}>".format(i), score=0.0, type=6
+                    )
                 )
         text_tokenizer.refresh()
 
     def _build_text_tokenizer(self, encode_special_tokens=False):
         tokenizer = TextTokenizer(self.vocab_file)
         self._configure_tokenizer(
-            tokenizer, self.special_tokens, self.max_blank_length, self.byte_fallback, encode_special_tokens
+            tokenizer,
+            self.special_tokens,
+            self.max_blank_length,
+            self.byte_fallback,
+            encode_special_tokens,
         )
         return tokenizer
 
@@ -109,7 +132,12 @@ class SPTokenizer:
         return text
 
     def encode(
-        self, text: str, linebreak=True, whitespaces=True, special_tokens=False, add_dummy_prefix=True
+        self,
+        text: str,
+        linebreak=True,
+        whitespaces=True,
+        special_tokens=False,
+        add_dummy_prefix=True,
     ) -> List[int]:
         """
         @param text: Text to encode.
@@ -121,14 +149,18 @@ class SPTokenizer:
         text = self._preprocess(text, linebreak, whitespaces)
         if not add_dummy_prefix:
             text = "<n>" + text
-        tmp = self._get_text_tokenizer(encode_special_tokens=special_tokens).encode(text)
+        tmp = self._get_text_tokenizer(encode_special_tokens=special_tokens).encode(
+            text
+        )
         tokens = [x + self.num_image_tokens for x in tmp]
         return tokens if add_dummy_prefix else tokens[2:]
 
     def decode(self, text_ids: List[int], special_tokens=False) -> str:
         ids = [int(_id) - self.num_image_tokens for _id in text_ids]
         ids = [_id for _id in ids if _id >= 0]
-        text = self._get_text_tokenizer(encode_special_tokens=special_tokens).decode(ids)
+        text = self._get_text_tokenizer(encode_special_tokens=special_tokens).decode(
+            ids
+        )
         text = text.replace("<n>", "\n")
         text = text.replace(SPTokenizer.get_tab_token(), "\t")
         for i in range(2, self.max_blank_length + 1):
@@ -136,7 +168,12 @@ class SPTokenizer:
         return text
 
     def tokenize(
-        self, text: str, linebreak=True, whitespaces=True, special_tokens=False, add_dummy_prefix=True
+        self,
+        text: str,
+        linebreak=True,
+        whitespaces=True,
+        special_tokens=False,
+        add_dummy_prefix=True,
     ) -> List[str]:
         """
         @param text: Text to encode.
@@ -148,7 +185,9 @@ class SPTokenizer:
         text = self._preprocess(text, linebreak, whitespaces)
         if not add_dummy_prefix:
             text = "<n>" + text
-        tokens = self._get_text_tokenizer(encode_special_tokens=special_tokens).tokenize(text)
+        tokens = self._get_text_tokenizer(
+            encode_special_tokens=special_tokens
+        ).tokenize(text)
         return tokens if add_dummy_prefix else tokens[2:]
 
     def __getitem__(self, x: Union[int, str]):
@@ -156,12 +195,16 @@ class SPTokenizer:
             if x < self.num_image_tokens:
                 return "<image_{}>".format(x)
             else:
-                return self.text_tokenizer.convert_id_to_token(x - self.num_image_tokens)
+                return self.text_tokenizer.convert_id_to_token(
+                    x - self.num_image_tokens
+                )
         elif isinstance(x, str):
             if x.startswith("<image_") and x.endswith(">") and x[7:-1].isdigit():
                 return int(x[7:-1])
             else:
-                return self.text_tokenizer.convert_token_to_id(x) + self.num_image_tokens
+                return (
+                    self.text_tokenizer.convert_token_to_id(x) + self.num_image_tokens
+                )
         else:
             raise ValueError("The key should be str or int.")
 
@@ -180,23 +223,23 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask", "position_ids"]
 
     def __init__(
-            self,
-            vocab_file,
-            do_lower_case=False,
-            remove_space=False,
-            bos_token='sop',
-            eos_token='eos',
-            eop_token='eop',
-            mask_token='[MASK]',
-            gmask_token='[gMASK]',
-            padding_side="left",
-            **kwargs
+        self,
+        vocab_file,
+        do_lower_case=False,
+        remove_space=False,
+        bos_token="sop",
+        eos_token="eos",
+        eop_token="eop",
+        mask_token="[MASK]",
+        gmask_token="[gMASK]",
+        padding_side="left",
+        **kwargs,
     ) -> None:
         super().__init__(
             do_lower_case=do_lower_case,
             remove_space=remove_space,
             padding_side=padding_side,
-            **kwargs
+            **kwargs,
         )
 
         self.do_lower_case = do_lower_case
@@ -225,11 +268,11 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
 
     @property
     def vocab_size(self):
-        """ Returns vocab size """
+        """Returns vocab size"""
         return self.sp_tokenizer.num_tokens
 
     def get_vocab(self):
-        """ Returns vocab as a dict """
+        """Returns vocab as a dict"""
         vocab = {self._convert_id_to_token(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
@@ -246,7 +289,7 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         return outputs
 
     def _tokenize(self, text, **kwargs):
-        """ Returns a tokenized string. """
+        """Returns a tokenized string."""
         text = self.preprocess_text(text)
 
         seq = self.sp_tokenizer.tokenize(text)
@@ -254,27 +297,29 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         return seq
 
     def decode(
-            self,
-            token_ids: Union[List[int], List[List[int]]],
-            skip_special_tokens: bool = False,
-            clean_up_tokenization_spaces: bool = True,
-            spaces_between_special_tokens: bool = True,
-            **kwargs
+        self,
+        token_ids: Union[List[int], List[List[int]]],
+        skip_special_tokens: bool = False,
+        clean_up_tokenization_spaces: bool = True,
+        spaces_between_special_tokens: bool = True,
+        **kwargs,
     ) -> str:
         if isinstance(token_ids[0], list):
             tokens = []
             for single_token_ids in token_ids:
                 if self.pad_token_id in single_token_ids:  # remove pad
-                    single_token_ids = list(filter((self.pad_token_id).__ne__, single_token_ids))
+                    single_token_ids = list(
+                        filter((self.pad_token_id).__ne__, single_token_ids)
+                    )
                 tokens.append(self.sp_tokenizer.decode(single_token_ids))
-            return (tokens)
+            return tokens
         else:
             if self.pad_token_id in token_ids:  # remove pad
                 token_ids = list(filter((self.pad_token_id).__ne__, token_ids))
             return self.sp_tokenizer.decode(token_ids)
 
     def _convert_token_to_id(self, token):
-        """ Converts a token (str) in an id using the vocab. """
+        """Converts a token (str) in an id using the vocab."""
         return self.sp_tokenizer[token]
 
     def _convert_id_to_token(self, index):
@@ -301,7 +346,7 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         else:
             vocab_file = save_directory
 
-        with open(self.vocab_file, 'rb') as fin:
+        with open(self.vocab_file, "rb") as fin:
             proto_str = fin.read()
 
         with open(vocab_file, "wb") as writer:
@@ -310,7 +355,7 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         return (vocab_file,)
 
     def build_inputs_with_special_tokens(
-            self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
     ) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
@@ -389,10 +434,17 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
         if padding_strategy == PaddingStrategy.LONGEST:
             max_length = len(required_input)
 
-        if max_length is not None and pad_to_multiple_of is not None and (max_length % pad_to_multiple_of != 0):
+        if (
+            max_length is not None
+            and pad_to_multiple_of is not None
+            and (max_length % pad_to_multiple_of != 0)
+        ):
             max_length = ((max_length // pad_to_multiple_of) + 1) * pad_to_multiple_of
 
-        needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
+        needs_to_be_padded = (
+            padding_strategy != PaddingStrategy.DO_NOT_PAD
+            and len(required_input) != max_length
+        )
 
         # Initialize attention mask if not present.
         if max_length is not None:
@@ -409,31 +461,46 @@ class ChatGLMTokenizer(PreTrainedTokenizer):
 
             if "position_ids" not in encoded_inputs:
                 position_ids = np.arange(seq_length, dtype=np.int64)
-                mask_token = mask_token_id if mask_token_id in required_input else gmask_token_id
+                mask_token = (
+                    mask_token_id if mask_token_id in required_input else gmask_token_id
+                )
                 if mask_token in required_input:
                     mask_position = required_input.index(mask_token)
                     position_ids[context_length:] = mask_position
                 block_position_ids = np.concatenate(
-                    [np.zeros(context_length, dtype=np.int64),
-                     np.arange(1, seq_length - context_length + 1, dtype=np.int64)])
-                encoded_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+                    [
+                        np.zeros(context_length, dtype=np.int64),
+                        np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+                    ]
+                )
+                encoded_inputs["position_ids"] = np.stack(
+                    [position_ids, block_position_ids], axis=0
+                )
 
         if needs_to_be_padded:
             difference = max_length - len(required_input)
 
             if "attention_mask" in encoded_inputs:
-                encoded_inputs["attention_mask"] = np.pad(encoded_inputs["attention_mask"],
-                                                          pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                                                          mode='constant', constant_values=True)
+                encoded_inputs["attention_mask"] = np.pad(
+                    encoded_inputs["attention_mask"],
+                    pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                    mode="constant",
+                    constant_values=True,
+                )
             if "token_type_ids" in encoded_inputs:
-                encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
-                    "token_type_ids"
-                ]
+                encoded_inputs["token_type_ids"] = [
+                    self.pad_token_type_id
+                ] * difference + encoded_inputs["token_type_ids"]
             if "special_tokens_mask" in encoded_inputs:
-                encoded_inputs["special_tokens_mask"] = [1] * difference + encoded_inputs["special_tokens_mask"]
+                encoded_inputs["special_tokens_mask"] = [
+                    1
+                ] * difference + encoded_inputs["special_tokens_mask"]
             if "position_ids" in encoded_inputs:
-                encoded_inputs["position_ids"] = np.pad(encoded_inputs["position_ids"],
-                                                        pad_width=[(0, 0), (difference, 0)])
-            encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
+                encoded_inputs["position_ids"] = np.pad(
+                    encoded_inputs["position_ids"], pad_width=[(0, 0), (difference, 0)]
+                )
+            encoded_inputs[self.model_input_names[0]] = [
+                self.pad_token_id
+            ] * difference + required_input
 
         return encoded_inputs

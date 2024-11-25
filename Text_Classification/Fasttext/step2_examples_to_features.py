@@ -1,10 +1,10 @@
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   convert_token_ids.py
 @Time    :   2020/11/04 13:39:13
 @Author  :   xiaolu 
 @Contact :   luxiaonlp@163.com
-'''
+"""
 import os
 import json
 import pandas
@@ -16,15 +16,10 @@ from config import set_args
 
 
 class RankExample(object):
-    def __init__(self,
-                 doc_id,
-                 question_text,
-                 context,
-                 answer=None,
-                 label=None,
-                 keywords=None
-                 ):
-                 # keywords
+    def __init__(
+        self, doc_id, question_text, context, answer=None, label=None, keywords=None
+    ):
+        # keywords
         self.doc_id = doc_id
         self.question_text = question_text
         self.context = context
@@ -53,7 +48,7 @@ class InputFeatures(object):
         self.trigram = trigram
         self.seq_len = seq_len
         self.label = label
-    
+
     def __str__(self):
         return self.__repr__()
 
@@ -72,22 +67,28 @@ def build_vocab(train_examples, dev_examples, tokenizer, max_size, min_freq):
     for t in tqdm(train_examples):
         question = t.question_text
         context = t.context
-        keywords = ','.join(t.keywords)
-        text = ''.join([question, context, keywords])
+        keywords = ",".join(t.keywords)
+        text = "".join([question, context, keywords])
         for word in tokenizer(text):
             vocab_dic[word] = vocab_dic.get(word, 0) + 1
-        
+
     for d in tqdm(dev_examples):
         question = t.question_text
         context = t.context
-        keywords = ','.join(t.keywords)
-        text = ''.join([question, context, keywords])
+        keywords = ",".join(t.keywords)
+        text = "".join([question, context, keywords])
         for word in tokenizer(text):
             vocab_dic[word] = vocab_dic.get(word, 0) + 1
-    
-    vocab_list = sorted([_ for _ in vocab_dic.items() if _[1] >= min_freq], key=lambda x: x[1], reverse=True)[:max_size]
+
+    vocab_list = sorted(
+        [_ for _ in vocab_dic.items() if _[1] >= min_freq],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:max_size]
     vocab_dic = {word_count[0]: idx for idx, word_count in enumerate(vocab_list)}
-    vocab_dic.update({UNK: len(vocab_dic), PAD: len(vocab_dic)+1, SEP: len(vocab_dic)+2})
+    vocab_dic.update(
+        {UNK: len(vocab_dic), PAD: len(vocab_dic) + 1, SEP: len(vocab_dic) + 2}
+    )
     return vocab_dic
 
 
@@ -108,21 +109,21 @@ def convert_examples_to_features(args, examples, vocab):
         words_line = []
         question = e.question_text
         context = e.context
-        keywords = ','.join(e.keywords)
+        keywords = ",".join(e.keywords)
         token = []
-        token.extend(tokenizer(question))   # 问题加入
-        token.append(SEP)   # 加入特殊字符  将问题和文章隔开 让模型去学习
+        token.extend(tokenizer(question))  # 问题加入
+        token.append(SEP)  # 加入特殊字符  将问题和文章隔开 让模型去学习
         token.extend(tokenizer(keywords + context))  # 关键词与文章加入
         seq_len = len(token)
         if args.pad_size:
             if len(token) < args.pad_size:
                 token.extend([PAD] * (args.pad_size - len(token)))
             else:
-                token = token[:args.pad_size]
+                token = token[: args.pad_size]
                 seq_len = args.pad_size
         for word in token:
             words_line.append(vocab.get(word, vocab.get(UNK)))
-        
+
         # fasttext ngram
         buckets = args.n_gram_vocab
         bigram = []
@@ -130,50 +131,59 @@ def convert_examples_to_features(args, examples, vocab):
         for i in range(args.pad_size):
             bigram.append(biGramHash(words_line, i, buckets))
             trigram.append(triGramHash(words_line, i, buckets))
-        features.append(InputFeatures(input_ids=words_line, bigram=bigram, trigram=trigram, seq_len=seq_len, label=int(e.label)))
+        features.append(
+            InputFeatures(
+                input_ids=words_line,
+                bigram=bigram,
+                trigram=trigram,
+                seq_len=seq_len,
+                label=int(e.label),
+            )
+        )
     return features
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = set_args()
     # 训练集
-    with gzip.open('./data/train_examples.pkl.gz', 'rb') as f:
-        train_examples = pickle.load(f)   
+    with gzip.open("./data/train_examples.pkl.gz", "rb") as f:
+        train_examples = pickle.load(f)
 
     # 测试集
-    with gzip.open('./data/dev_examples.pkl.gz', 'rb') as f:
+    with gzip.open("./data/dev_examples.pkl.gz", "rb") as f:
         dev_examples = pickle.load(f)
-    
+
     # 建立分词器
     if args.is_word:
         # 如果你分好词了  可以将args.is_word置为True
-        tokenizer = lambda x: x.split(' ')   # 词级别
+        tokenizer = lambda x: x.split(" ")  # 词级别
     else:
-        tokenizer = lambda x: [y for y in x]   # 字符级别
-    
-    min_freq=1
+        tokenizer = lambda x: [y for y in x]  # 字符级别
+
+    min_freq = 1
     MAX_VOCAB_SIZE = 10000
-    UNK, PAD, SEP = '<UNK>', '<PAD>', '<SEP>'
+    UNK, PAD, SEP = "<UNK>", "<PAD>", "<SEP>"
 
     # 是否已构建好词表
-    print('load to vocab...')
+    print("load to vocab...")
     if os.path.exists(args.vocab_path):
-        vocab = pickle.load(open(args.vocab_path, 'rb'))
+        vocab = pickle.load(open(args.vocab_path, "rb"))
     else:
         # 建立词表
-        vocab = build_vocab(train_examples, dev_examples, tokenizer, MAX_VOCAB_SIZE, min_freq)
-        pickle.dump(vocab, open(args.vocab_path, 'wb'))
-    print('loaded vocab finish!')
+        vocab = build_vocab(
+            train_examples, dev_examples, tokenizer, MAX_VOCAB_SIZE, min_freq
+        )
+        pickle.dump(vocab, open(args.vocab_path, "wb"))
+    print("loaded vocab finish!")
 
     # print(len(vocab))   # 6713
     # print(vocab)
-    print('正在处理训练集...')
+    print("正在处理训练集...")
     train_features = convert_examples_to_features(args, train_examples, vocab)
-    with gzip.open('./data/train_features.pkl.gz', 'wb') as fout:
+    with gzip.open("./data/train_features.pkl.gz", "wb") as fout:
         pickle.dump(train_features, fout)
 
-    print('正在处理验证集...')
+    print("正在处理验证集...")
     dev_features = convert_examples_to_features(args, dev_examples, vocab)
-    with gzip.open('./data/dev_features.pkl.gz', 'wb') as fout:
+    with gzip.open("./data/dev_features.pkl.gz", "wb") as fout:
         pickle.dump(dev_features, fout)
-    
