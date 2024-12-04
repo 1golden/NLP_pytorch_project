@@ -13,12 +13,12 @@ from transformers.models.bert import BertModel, BertConfig
 
 class Caps_Layer(nn.Module):
     def __init__(self, input_dim_capsule, num_capsule, dim_capsule, routings):
-        '''
+        """
         :param input_dim_capsule: 输入的维度 即: hidden_size
         :param num_capsule: capsule的个数
         :param dim_capsule: 每个capsule的维度
         :param routings: 进行几次路由计算
-        '''
+        """
         super(Caps_Layer, self).__init__()
         self.num_capsule = num_capsule
         self.dim_capsule = dim_capsule
@@ -26,7 +26,9 @@ class Caps_Layer(nn.Module):
         self.activation = self.squash
 
         self.W = nn.Parameter(
-            nn.init.xavier_normal_(torch.empty(1, input_dim_capsule, self.num_capsule * self.dim_capsule))
+            nn.init.xavier_normal_(
+                torch.empty(1, input_dim_capsule, self.num_capsule * self.dim_capsule)
+            )
         )
 
     def forward(self, x):
@@ -35,10 +37,16 @@ class Caps_Layer(nn.Module):
         input_num_capsule = x.size(1)  # max_len
 
         u_hat_vecs = torch.matmul(x, self.W)
-        u_hat_vecs = u_hat_vecs.view((batch_size, input_num_capsule, self.num_capsule, self.dim_capsule))
+        u_hat_vecs = u_hat_vecs.view(
+            (batch_size, input_num_capsule, self.num_capsule, self.dim_capsule)
+        )
 
-        u_hat_vecs = u_hat_vecs.permute(0, 2, 1, 3)  # 变为(batch_size, num_capsule, input_num_capsule, dim_capsule)
-        b = torch.zeros_like(u_hat_vecs[:, :, :, 0])  # (batch_size, num_capsule, input_num_capsule)
+        u_hat_vecs = u_hat_vecs.permute(
+            0, 2, 1, 3
+        )  # 变为(batch_size, num_capsule, input_num_capsule, dim_capsule)
+        b = torch.zeros_like(
+            u_hat_vecs[:, :, :, 0]
+        )  # (batch_size, num_capsule, input_num_capsule)
         # print(b.size())   # torch.Size([2, 10, 128])
 
         outputs = None
@@ -47,15 +55,19 @@ class Caps_Layer(nn.Module):
             c = F.softmax(b, dim=2)
             c = c.permute(0, 2, 1)
             b = b.permute(0, 2, 1)
-            outputs = self.activation(torch.einsum('bij,bijk->bik', c, u_hat_vecs))  # batch matrix multiplication
+            outputs = self.activation(
+                torch.einsum("bij,bijk->bik", c, u_hat_vecs)
+            )  # batch matrix multiplication
             # outputs shape (batch_size, num_capsule, dim_capsule)
             if i < self.routings - 1:
-                b = torch.einsum('bik,bijk->bij', outputs, u_hat_vecs)  # batch matrix multiplication
+                b = torch.einsum(
+                    "bik,bijk->bij", outputs, u_hat_vecs
+                )  # batch matrix multiplication
         return outputs  # (batch_size, num_capsule, dim_capsule)
 
     def squash(self, x, axis=-1):
         T_epsilon = 1e-7
-        s_squared_norm = (x ** 2).sum(axis, keepdim=True)
+        s_squared_norm = (x**2).sum(axis, keepdim=True)
         scale = torch.sqrt(s_squared_norm + T_epsilon)
         return x / scale
 
@@ -67,9 +79,13 @@ class GRU_Layer(nn.Module):
 
     def init_weights(self):
         # 初始化参数
-        ih = (param.data for name, param in self.named_parameters() if 'weight_ih' in name)
-        hh = (param.data for name, param in self.named_parameters() if 'weight_hh' in name)
-        b = (param.data for name, param in self.named_parameters() if 'bias' in name)
+        ih = (
+            param.data for name, param in self.named_parameters() if "weight_ih" in name
+        )
+        hh = (
+            param.data for name, param in self.named_parameters() if "weight_hh" in name
+        )
+        b = (param.data for name, param in self.named_parameters() if "bias" in name)
         for k in ih:
             nn.init.xavier_uniform_(k)
         for k in hh:
@@ -86,7 +102,9 @@ class Classifier(nn.Module):
         super(Classifier, self).__init__()
         self.fc = nn.Sequential(
             nn.Dropout(p=dropout, inplace=True),
-            nn.Linear(num_capsule * dim_capsule, num_classes),  # num_capsule*dim_capsule -> num_classes
+            nn.Linear(
+                num_capsule * dim_capsule, num_classes
+            ),  # num_capsule*dim_capsule -> num_classes
         )
 
     def forward(self, x):
@@ -104,18 +122,24 @@ class Model(nn.Module):
         self.Routings = 5
         self.dropout_p = 0.25
         self.num_classes = 31
-        self.config = BertConfig.from_pretrained('../bert_pretrain/config.json')
-        self.model = BertModel.from_pretrained('../bert_pretrain/pytorch_model.bin', config=self.config)
+        self.config = BertConfig.from_pretrained("../bert_pretrain/config.json")
+        self.model = BertModel.from_pretrained(
+            "../bert_pretrain/pytorch_model.bin", config=self.config
+        )
         self.gru = GRU_Layer(gru_len=self.gru_len)
-        self.capsule = Caps_Layer(input_dim_capsule=2*self.gru_len,
-                                  num_capsule=self.num_capsule,
-                                  dim_capsule=self.dim_capsule,
-                                  routings=self.Routings)
+        self.capsule = Caps_Layer(
+            input_dim_capsule=2 * self.gru_len,
+            num_capsule=self.num_capsule,
+            dim_capsule=self.dim_capsule,
+            routings=self.Routings,
+        )
 
-        self.output = Classifier(dropout=self.dropout_p,
-                                 num_capsule=self.num_capsule,
-                                 dim_capsule=self.dim_capsule,
-                                 num_classes=self.num_classes)
+        self.output = Classifier(
+            dropout=self.dropout_p,
+            num_capsule=self.num_capsule,
+            dim_capsule=self.dim_capsule,
+            num_classes=self.num_classes,
+        )
 
     def forward(self, input_ids, attention_mask):
         bert_output = self.model(input_ids=input_ids, attention_mask=attention_mask)
@@ -125,6 +149,6 @@ class Model(nn.Module):
         # print(gru_output[0].size())    # torch.Size([128, 2, 256])
         # print(gru_output[1].size())    # torch.Size([2, 2, 128])
         gru_encode = gru_output[0].permute(1, 0, 2)
-        caps_output = self.capsule(gru_encode)    # torch.Size([2, 10, 16])
+        caps_output = self.capsule(gru_encode)  # torch.Size([2, 10, 16])
         logits = self.output(caps_output)
         return logits

@@ -16,8 +16,8 @@ class QueryParser:
 
     def parse(self):
         with open(self.filename) as f:
-            lines = ''.join(f.readlines())
-        self.queries = [x.rstrip().split() for x in lines.split('\n')[:-1]]
+            lines = "".join(f.readlines())
+        self.queries = [x.rstrip().split() for x in lines.split("\n")[:-1]]
 
     def get_queries(self):
         return self.queries
@@ -27,18 +27,18 @@ class CorpusParser:
     # 加载文章
     def __init__(self, filename):
         self.filename = filename
-        self.regex = re.compile('^#\s*\d+')
+        self.regex = re.compile("^#\s*\d+")
         self.corpus = dict()
 
     def parse(self):
         with open(self.filename) as f:
-            s = ''.join(f.readlines())   # 全部文章
+            s = "".join(f.readlines())  # 全部文章
 
-        blobs = s.split('#')[1:]  # 第一堆多篇文章
+        blobs = s.split("#")[1:]  # 第一堆多篇文章
         for x in blobs:
-            text = x.split()   # 第一篇文章
+            text = x.split()  # 第一篇文章
             docid = text.pop(0)
-            self.corpus[docid] = text   # {id1:文章, id2:文章, id3:文章...}
+            self.corpus[docid] = text  # {id1:文章, id2:文章, id3:文章...}
 
     def get_corpus(self):
         return self.corpus
@@ -66,21 +66,27 @@ class QueryProcessor:
 
     def run(self):
         results = []
-        for query in self.queries:   # 遍历问题
+        for query in self.queries:  # 遍历问题
             # print(self.run_query(query))   # {'1930': 9.646567300695821, '2246': 11.75268877838768, ...}
             results.append(self.run_query(query))
         return results
 
     def run_query(self, query):
         query_result = dict()
-        for term in query:   # 遍历问题中的每个词
+        for term in query:  # 遍历问题中的每个词
             if term in self.index:
-                doc_dict = self.index[term]   # 取出当前词的在每篇文章中的统计次数
+                doc_dict = self.index[term]  # 取出当前词的在每篇文章中的统计次数
                 for docid, freq in doc_dict.items():
                     # 文章id  当前问题中的这个词在当前文章中出现的次数
-                    score = score_BM25(n=len(doc_dict), f=freq, qf=1, r=0, N=len(self.dlt),
-                                       dl=self.dlt.get_length(docid),
-                                       avdl=self.dlt.get_average_length())  # calculate score)
+                    score = score_BM25(
+                        n=len(doc_dict),
+                        f=freq,
+                        qf=1,
+                        r=0,
+                        N=len(self.dlt),
+                        dl=self.dlt.get_length(docid),
+                        avdl=self.dlt.get_average_length(),
+                    )  # calculate score)
                     if docid in query_result:
                         query_result[docid] += score
                     else:
@@ -101,7 +107,7 @@ class InvertedIndex:
     def add(self, word, docid):
         # index: {词1:{1: freq_num, 2: freq_num, 3: freq_num, 4, 5, 6, 7, 8..}, {词2:{...}}}  # 当前这个词在每篇文章出现的次数
         if word in self.index:  # 如果当前词在字典中
-            if docid in self.index[word]:   # 如果文章id也在这个词对应的列表中
+            if docid in self.index[word]:  # 如果文章id也在这个词对应的列表中
                 self.index[word][docid] += 1
             else:
                 self.index[word][docid] = 1
@@ -116,16 +122,16 @@ class InvertedIndex:
             if docid in self.index[word]:
                 return self.index[word][docid]
             else:
-                raise LookupError('%s not in document %s' % (str(word), str(docid)))
+                raise LookupError("%s not in document %s" % (str(word), str(docid)))
         else:
-            raise LookupError('%s not in index' % str(word))
+            raise LookupError("%s not in index" % str(word))
 
     # frequency of word in index, i.e. number of documents that contain word
     def get_index_frequency(self, word):
         if word in self.index:
             return len(self.index[word])
         else:
-            raise LookupError('%s not in index' % word)
+            raise LookupError("%s not in index" % word)
 
 
 class DocumentLengthTable:
@@ -142,7 +148,7 @@ class DocumentLengthTable:
         if docid in self.table:
             return self.table[docid]
         else:
-            raise LookupError('%s not found in table' % str(docid))
+            raise LookupError("%s not found in table" % str(docid))
 
     def get_average_length(self):
         sum = 0
@@ -153,22 +159,22 @@ class DocumentLengthTable:
 
 def main():
     # 1. 对问题进行加载
-    qp = QueryParser(filename='./data/queries.txt')   # 加载问题
+    qp = QueryParser(filename="./data/queries.txt")  # 加载问题
     qp.parse()
     queries = qp.get_queries()
     # print(queries)   # 得到问题的分词形式
     # [['portabl', 'oper', 'system'], ['code', 'optim', 'for', 'space', 'effici']]
 
     # 2. 对文章进行加载
-    cp = CorpusParser(filename='./data/corpus.txt')    # 加载文章
+    cp = CorpusParser(filename="./data/corpus.txt")  # 加载文章
     cp.parse()
     corpus = cp.get_corpus()
     # print(corpus)
     # {'1': [词1, 词2....], '2': [词1, 词2....], '3': [词1, 词2....]...}
 
-    proc = QueryProcessor(queries, corpus)   # 对问题和文章进行简单的统计
+    proc = QueryProcessor(queries, corpus)  # 对问题和文章进行简单的统计
 
-    results = proc.run()   # {'1930': 9.646567300695821, '2246': 11.75268877838768, ...}
+    results = proc.run()  # {'1930': 9.646567300695821, '2246': 11.75268877838768, ...}
     # [{'1930': 9.646567300695821, '2246': 11.75268877838768}, {'2593': 6.5143785126884, '3127': 15.01712203629322} ...]
     # print(len(results))   # 7
     # print(len(results[0]))    # 871
@@ -181,13 +187,12 @@ def main():
         index = 0
         for i in sorted_x[:10]:
             tmp = (qid, i[0], index, i[1])
-            print('问题id:{}, 相关段落的id:{}, 最相关排序:{}, 相关得分:{}'.format(*tmp))
+            print("问题id:{}, 相关段落的id:{}, 最相关排序:{}, 相关得分:{}".format(*tmp))
             index += 1
         exit()
-
 
         qid += 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

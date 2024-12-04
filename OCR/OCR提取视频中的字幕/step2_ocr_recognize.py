@@ -12,7 +12,6 @@ import paddlehub as hub
 # pip install paddlehub==2.0.0
 # pip install shapely=='1.8.1.post1'
 # pip install pyclipper=='1.3.0.post2'
- 
 
 
 if __name__ == '__main__':
@@ -48,7 +47,3 @@ if __name__ == '__main__':
     final_text = '，'.join(final_text)
     print(final_text)
     print('总共花费时间:', e - s)
-
-
-
-
